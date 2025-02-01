@@ -131,6 +131,14 @@ Cool! It seems that the darkest blue points (countries with the lowest SDG 5 sco
 #### <span style="color: red;">Challenge 1</span>
 Create a scatterplot using two different SDG scores. Then, color the points by using a third SDG score. In a couple of sentences, describe what you see.
 
+
+```{r}
+ggplot(data = sdr_data, aes(x= goal_7_score, y = goal_9_score, color = goal_16_score)) +
+  geom_point()
+```
+
+Interpretation: This scatter plot shows that as goal_7_score increases (x-axis), goal_9_score (y-axis) also tends to increase. The lighter blue points, representing higher goal_16_score, are mostly found in the upper-right area, where both scores are high. Darker blue points, indicating lower goal_16_score, are spread more across the lower and middle ranges of the graph.
+
 ### Bar Chart
 
 When should we use a **bar chart**?
@@ -190,6 +198,18 @@ As we can see in the Oceania region, most Countries do not have the necessary da
 #### <span style="color: red;">Challenge 2</span>
 Create a new bar chart with countries only from the MENA region. 
 
+```{r}
+mena_sdr_data <- sdr_data %>% 
+  filter(regions_used_for_the_sdr == "MENA") # filtering for LAC countries only
+```
+
+Now let's make a bar chart from our new dataframe `lac_sdr_data`
+
+```{r}
+ggplot(mena_sdr_data, aes(x= goal_3_score, y = country)) +
+  geom_bar(stat = "identity") 
+```
+
 ### Histogram
 
 When do we use a **histogram**?
@@ -224,3 +244,9 @@ Countries that fall in the higher end of the Goal 4 spectrum belong to the OECD 
 
 #### <span style="color: red;">Challenge 3</span>
 Make a histogram for a different SDG score. Then, fill by region. In a couple of sentences, describe any interesting trends or what you notice from your new histogram.
+
+```{r}
+ggplot(sdr_data, aes(x = goal_9_score, fill=regions_used_for_the_sdr)) + 
+  geom_histogram(bins=33, color="black")
+```
+Interesting: This histogram shows the distribution of goal_9_score across regions. Unlike the previous plot, the scores are more evenly spread across the range, with no single region dominating the highest or lowest scores. OECD countries (pink) appear frequently across the middle to higher ranges, while Sub-Saharan Africa (gray) is visible across lower and mid-range scores. Other regions, such as East and South Asia (green) and Europe and Central Asia (orange), are distributed throughout the range without a clear concentration in any specific area.
