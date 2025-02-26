@@ -1,0 +1,491 @@
+---
+title: "Keyna's Sustainable Development Goals (SDG) Progress"
+output: html_document
+date: "2025-02-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)  
+library(janitor)    
+library(ggplot2)  
+library(readr)      
+library(here)       
+library(plotly)  
+library(cluster)    
+library(factoextra) 
+library(lubridate)
+library(ggpubr)
+
+library(ggrepel)
+library(dplyr)
+
+library(naniar)
+library(randomForest)
+library(missRanger)
+library(pdp)
+library(vembedr)
+```
+
+```{r}
+# Load the data from the CSV file
+data <- read_csv(here("data/SDR-2023-Data.csv")) %>% 
+  clean_names()
+```
+
+```{r, message=FALSE}
+head(data)
+```
+
+```{r, message=FALSE}
+kenya_data <- data %>% filter(country == "Kenya")
+```
+
+```{r, message=FALSE}
+print(kenya_data)
+```
+
+
+
+### Kenya's 2023 Normalized SDG Scores
+
+The radar chart representing Kenya's 2023 normalized SDG scores tells a compelling story about the country's progress toward achieving the United Nations' Sustainable Development Goals. By mapping out all 17 SDGs on a single visualization, we can see not only the country’s strengths but also areas requiring greater attention. It highlights strengths in areas like Clean Water & Sanitation and Affordable Energy, while showing weaker performance in Good Health and Well-being and Quality Education.
+
+```{r, message=FALSE}
+kenya_scores <- kenya_data %>%
+  select(goal_1_score, goal_2_score, goal_3_score, goal_4_score,
+         goal_5_score, goal_6_score, goal_7_score, goal_8_score,
+         goal_9_score, goal_10_score, goal_11_score, goal_12_score,
+         goal_13_score, goal_14_score, goal_15_score, goal_16_score,
+         goal_17_score)
+```
+
+```{r, message=FALSE}
+max_values <- rep(100, 17)
+min_values <- rep(0, 17)
+```
+
+```{r, message=FALSE}
+radar_data <- rbind(max_values, min_values, as.numeric(kenya_scores[1, ]))
+```
+
+```{r, message=FALSE}
+colnames(radar_data) <- colnames(kenya_scores)
+```
+
+```{r, message=FALSE}
+radar_data <- as.data.frame(radar_data)
+```
+
+```{r, message=FALSE}
+colnames(radar_data) <- paste0("G", 1:17)
+```
+
+```{r, message=FALSE}
+radar_df <- kenya_scores %>%
+  pivot_longer(cols = everything(), names_to = "goal", values_to = "score")
+
+```
+
+```{r, message=FALSE}
+score_values <- c(
+  kenya_data$goal_1_score,
+  kenya_data$goal_2_score,
+  kenya_data$goal_3_score,
+  kenya_data$goal_4_score,
+  kenya_data$goal_5_score,
+  kenya_data$goal_6_score,
+  kenya_data$goal_7_score,
+  kenya_data$goal_8_score,
+  kenya_data$goal_9_score,
+  kenya_data$goal_10_score,
+  kenya_data$goal_11_score,
+  kenya_data$goal_12_score,
+  kenya_data$goal_13_score,
+  kenya_data$goal_14_score,
+  kenya_data$goal_15_score,
+  kenya_data$goal_16_score,
+  kenya_data$goal_17_score
+)
+theta_labels <- c(
+  "Goal 1",
+  "Goal 2",
+  "Goal 3",
+  "Goal 4",
+  "Goal 5",
+  "Goal 6",
+  "Goal 7",
+  "Goal 8",
+  "Goal 9",
+  "Goal 10",
+  "Goal 11",
+  "Goal 12",
+  "Goal 13",
+  "Goal 14",
+  "Goal 15",
+  "Goal 16",
+  "Goal 17"
+)
+```
+
+```{r, message=FALSE}
+goal_full_names <- c(
+  "No Poverty",
+  "Zero Hunger",
+  "Good Health & Well-Being",
+  "Quality Education",
+  "Gender Equality",
+  "Clean Water & Sanitation",
+  "Affordable & Clean Energy",
+  "Decent Work & Economic Growth",
+  "Industry, Innovation & Infrastructure",
+  "Reduced Inequalities",
+  "Sustainable Cities & Communities",
+  "Responsible Consumption & Production",
+  "Climate Action",
+  "Life Below Water",
+  "Life on Land",
+  "Peace, Justice & Strong Institutions",
+  "Partnerships for the Goals"
+)
+```
+
+```{r, message=FALSE}
+hover_text <- map2_chr(theta_labels, seq_along(score_values), function(g, i) {
+  score_val <- score_values[i]
+  goal_name <- goal_full_names[i]
+  if (is.na(score_val)) {
+    paste0(g, " – ", goal_name, " (No Data)")
+  } else {
+    paste0(g, " – ", goal_name, " (Score: ", round(score_val, 1), ")")
+  }
+})
+```
+
+```{r, message=FALSE}
+keyna_scatter <- plot_ly(
+  type = 'scatterpolar',
+  width = 500,  
+  height = 500  
+) %>%
+  add_trace(
+    r = score_values,
+    theta = theta_labels,
+    mode = 'lines+markers',
+    fill = 'toself',
+    text = hover_text,
+    hoverinfo = 'text',
+    line = list(color = "#f67e52"),
+    marker = list(color = "#f67e52")
+  ) %>%
+  layout(
+    title = list(
+      text = "Kenya's 2023 Normalized SDG Scores",
+      x = 10, 
+      xanchor = "center"  
+    ),
+    polar = list(
+      radialaxis = list(
+        visible = TRUE,
+        range = c(0, 100)   
+      )
+    ),
+    showlegend = FALSE,
+    margin = list(t = 50, r = 50, b = 50, l = 50) 
+  )
+
+keyna_scatter
+
+```
+
+### Education vs. Health: Impact of Gender Equality 
+
+"Education vs. Health: Impact of Gender Equality for the Region of Sub-Saharan Africa" explores the relationship between gender equality (Goal 5) and two other SDGs: Goal 4 (Education: Literacy Rate) and Goal 3 (Health: Life Expectancy) in the Sub-Saharan Africa region. As described in the [Five Pillars of Development](http://docs-do-not-link.udc.edu/causes/Five-Pillars-DC-Final-05-2018.pdf), "health, education, and gender equality" are integral components of sustainable development. This plot emphasizes the correlation between Gender Equality (Goal 5) and Health (Goal 3) and Education (Goal 4) in Sub-Saharan Africa, with a focus on Kenya. The data suggests that as gender equality improves, so do education and health outcomes.
+
+```{r, message=FALSE}
+sub_saharan_data <- data %>%
+  filter(regions_used_for_the_sdr == "Sub-Saharan Africa")
+```
+
+```{r, message=FALSE}
+scatter_plot <- plot_ly(
+  data = sub_saharan_data,
+  x = ~goal_4_score,  
+  y = ~goal_3_score,  
+  type = 'scatter',
+  mode = 'markers',
+  text = ~country,  
+  color = ~goal_5_score,  
+  colors = 'YlGnBu', 
+  marker = list(size = 12, opacity = 0.8)
+) %>%
+  layout(
+    title = "Education vs. Health: Impact of Gender Equality for the Region of Sub-Saharan Africa",
+    xaxis = list(title = "Goal 4 Education: Literacy Rate (%)"),
+    yaxis = list(title = "Goal 3 Health: Life Expectancy (Years)"),
+    showlegend = TRUE,
+    legend = list(title = list(text = "Goal 5: Gender Equality")) 
+  )
+
+scatter_plot <- scatter_plot %>%
+  add_trace(
+    data = sub_saharan_data %>% filter(country == 'Kenya'),
+    x = ~goal_4_score,
+    y = ~goal_3_score,
+    type = 'scatter',
+    mode = 'markers',
+    name = 'Kenya',
+    text = ~country, 
+    marker = list(
+      size = 12,
+      opacity = 1,
+      symbol = 'triangle', 
+      line = list(color = '#f67e52', width = 2)
+    )
+  ) %>%
+  
+  add_trace(
+    data = sub_saharan_data %>% filter(country != 'Kenya'),
+    x = ~goal_4_score,
+    y = ~goal_3_score,
+    type = 'scatter',
+    mode = 'markers',
+    name = 'Other Countries',
+    text = ~country, 
+    marker = list(
+      size = 12,
+      opacity = 0.8
+    )
+  )
+
+scatter_plot
+
+```
+
+
+### Comparison of Kenya's SDG Scores (with Regional Peers)
+
+"Comparison of Kenya's Health, Education, & Gender Equality Scores (with Regional Peers)" provides a visual comparison of Kenya's performance in three key Sustainable Development Goals (SDGs)—Goal 3 (Health & Well-being), Goal 4 (Quality Education), and Goal 5 (Gender Equality)—against five other countries in the Sub-Saharan African region: Ethiopia, Rwanda, Tanzania, and Uganda. It shows that Kenya is doing better than some countries in terms of education and gender equality, but lags behind in health.
+
+
+```{r, message=FALSE}
+kenya_scores_vector <- as.numeric(kenya_scores[1, ])
+names(kenya_scores_vector) <- colnames(kenya_scores)
+
+top_5_scores <- sort(kenya_scores_vector, decreasing = TRUE)[1:5]
+
+print(top_5_scores)
+```
+
+```{r, message=FALSE}
+regional_peers <- c("Kenya", "Uganda", "Tanzania", "Rwanda", "Ethiopia")
+```
+
+```{r, message=FALSE}
+sdgs_of_interest <- c("goal_3_score", "goal_4_score", "goal_5_score")
+```
+
+```{r, message=FALSE}
+sdgs_data <- data %>%
+  filter(country %in% regional_peers) %>%
+  select(country, all_of(sdgs_of_interest)) %>%
+  pivot_longer(cols = starts_with("goal_"), names_to = "SDG", values_to = "score")
+```
+
+```{r, message=FALSE}
+sdg_labels <- c(
+  "Goal 3: Health & Well-Being",
+  "Goal 4: Quality Education",
+  "Goal 5: Gender Equality"
+)
+```
+
+```{r, message=FALSE}
+sdgs_data$SDG <- factor(sdgs_data$SDG, levels = c("goal_3_score", "goal_4_score", "goal_5_score"), labels = sdg_labels)
+```
+
+```{r, message=FALSE}
+bar_chart <- plot_ly(
+  data = sdgs_data,
+  x = ~SDG,
+  y = ~score,
+  color = ~country,
+  type = 'bar'  
+) %>%
+  layout(
+    title = "Comparison of Kenya's Health,  Eduction, & Gender Equality Scores (with Regional Peers)",
+    xaxis = list(
+      title = "Sustainable Development Goals",
+      tickmode = 'array',
+      tickvals = sdg_labels, 
+      ticktext = sdg_labels  
+    ),
+    yaxis = list(
+      title = "Normalized Score"
+    ),
+    showlegend = TRUE,
+    barmode = 'group', 
+    margin = list(t = 50, r = 50, b = 50, l = 50)  
+  )
+bar_chart
+```
+
+
+### Trend Analysis of SDG Indicators
+
+This chart helps in understanding the dynamic nature of SDG progress across Sub-Saharan Africa. It allows for quick identification of countries that are experiencing positive developments, those facing setbacks, and those maintaining a steady course. By focusing on the trends, it highlights both the successes and challenges that will need targeted interventions. The diverse trend patterns underline the fact that development is non-linear, with some countries making rapid progress, while others face ongoing difficulties.
+
+```{r, message=FALSE}
+sub_saharan_data_clean <- sub_saharan_data %>%
+  gather(key = "goal", value = "trend_type", 
+         starts_with("goal_") & ends_with("trend")) %>%
+  mutate(
+    goal = gsub("goal_", "", goal),
+    trend_color = case_when(
+      trend_type == "↑" ~ "Improving",
+      trend_type == "→" ~ "Stable",
+      trend_type == "↓" ~ "Declining",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(trend_color)) %>%
+  mutate(hover_text = paste("SDG:", goal, "<br>", trend_type))
+```
+
+```{r, message=FALSE}
+trend_counts <- sub_saharan_data_clean %>%
+  group_by(country, trend_color) %>%
+  tally() %>%
+  ungroup()
+```
+
+```{r, message=FALSE}
+trend_counts <- trend_counts %>%
+  mutate(
+    sdg_list = sapply(1:n(), function(i) {
+      sdgs <- sub_saharan_data_clean %>%
+        filter(country == trend_counts$country[i], trend_color == trend_counts$trend_color[i]) %>%
+        pull(goal) %>%
+        unique()  
+      paste(sdg_label <- sdgs, collapse = ", ")
+    })
+  )
+
+```
+
+```{r, message=FALSE}
+trend_plot <- ggplot(trend_counts, aes(x = country, y = n, fill = trend_color, 
+                                       text = paste("Country:", country, 
+                                                    "<br>Trend Type:", trend_color, 
+                                                    "<br>Count:", n, "<br>SDGs:", sdg_list))) +
+  geom_bar(stat = "identity", position = "stack", linewidth = 1) +
+  scale_fill_manual(values = c("Improving" = "lightgreen", "Stable" = "lightblue", "Declining" = "pink")) +
+  labs(
+    title = "Trend of SDGs (Challenges & Achievements) for Sub-Saharan Africa",
+    x = "Country",
+    y = "Count of Trends",
+    fill = "Trend Type"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 10)
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplotly(trend_plot, tooltip = "text")
+
+```
+
+
+### Clustering of SDGs for Sub-Saharan Africa
+
+By clustering the countries based on their SDG performance, this visualization allows for the identification of groups with similar development patterns. Countries in the same cluster can share common challenges or successes, providing insights into the broader regional development landscape. Kenya falls in Cluster 2, suggesting that it is on a better trajectory than some other Sub-Saharan countries, but it still faces room for improvement, particularly in health and education.
+
+```{r, message=FALSE}
+# Read in data
+sdr_data <- read_csv(here("data/SDR-2023-Data.csv"))
+
+# Clean column names to make them easier to work with
+sdr_data <- sdr_data %>% clean_names()
+
+# Ensure that region column is included in the dataset with normalized scores
+sdr_data_normalized_scores <- sdr_data %>%
+  select(country, regions_used_for_the_sdr, contains("normalized_score"))  # Include region column
+
+# Visualize missing data in the normalized scores (keeping region column)
+gg_miss_var(sdr_data_normalized_scores, show_pct = TRUE) +
+  theme(axis.text.y = element_text(size = 8)) 
+
+# Pivot the data to longer format, while retaining the region column
+sdr_data_normalized_scores_longer <- sdr_data_normalized_scores %>%
+  pivot_longer(cols = !c(country, regions_used_for_the_sdr))  # Don't drop the region column
+
+# Summarize missing data by country and include region in the summary
+missing_data_by_country <- sdr_data_normalized_scores_longer %>%
+  group_by(country, regions_used_for_the_sdr) %>%
+  miss_var_summary() %>% 
+  arrange(desc(pct_miss))
+
+# List of countries that have completely missing data
+completely_na_countries  <- missing_data_by_country$country[missing_data_by_country$pct_miss == 100]
+
+# Filter out countries with completely missing data
+sdr_data_normalized_scores_no_na_countries <- sdr_data_normalized_scores %>% 
+  filter(!country %in% completely_na_countries)
+
+# Select columns with no more than 20% missing values, keeping region column
+sdr_data_normalized_scores_less_na <- sdr_data_normalized_scores_no_na_countries %>%
+  select(where(~ sum(is.na(.))/length(.) <= 0.2), country, regions_used_for_the_sdr)  # Keep region column
+
+# Impute missing values, ensuring the region column is included in the dataset
+sdr_data_imputed <- missRanger(sdr_data_normalized_scores_less_na)
+
+```
+
+```{r, message=FALSE}
+# Assuming 'region' is a column in your dataset
+sdr_data_africa <- subset(sdr_data_imputed, regions_used_for_the_sdr == "Sub-Saharan Africa")
+```
+
+```{r, message=FALSE}
+sum(is.na(sdr_data_africa))
+```
+
+```{r, message=FALSE}
+sdr_data_africa <- sdr_data_africa %>% select(-regions_used_for_the_sdr)
+
+sdr_data_africa <- sdr_data_africa %>%
+  remove_rownames %>%
+  column_to_rownames(var="country")
+```
+
+```{r, message=FALSE}
+# Using dplyr to remove specific rows by row names
+sdr_data_africa <- sdr_data_africa %>%
+  filter(!rownames(sdr_data_africa) %in% c("Low-income Countries", "Oceania", "Sub-Saharan Africa"))
+
+```
+
+```{r, message=FALSE}
+# Visualizing the silhouette method to determine the optimal number of clusters
+fviz_nbclust(sdr_data_africa, kmeans, method = "silhouette") +
+  theme_minimal()
+```
+
+```{r, message=FALSE}
+# Apply K-means clustering (using 3 clusters as an example)
+k_africa <- kmeans(sdr_data_africa, centers = 2)
+
+# View the clustering results (cluster centers and sizes)
+k_africa$centers
+k_africa$size
+
+```
+
+```{r, message=FALSE}
+fviz_cluster(k_africa, data = sdr_data_africa) +
+  theme_minimal() +
+  labs(title = "Clustering of SDGs for Sub-Saharan Africa")
+```
+
